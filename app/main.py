@@ -7,7 +7,10 @@ from mcp.fastmcp import FastMCP
 from sqlalchemy import text
 from dotenv import load_dotenv
 import openai
+
+#Import Tools
 from tools.task1_connection import generate_linkedin_connection_request
+from tools.task2_inquiry import linkedin_job_inquiry_request
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -52,6 +55,29 @@ def create_linkedin_request_endpoint(request: LinkedInRequest):
     generated_message = generate_linkedin_connection_request(
         name=request.name,
         about_section=request.about_section or ""
+    )
+    return {
+        "message": generated_message,
+        "length": len(generated_message)
+    }
+
+# Pydantic model for task 2
+class LinkedInJobInquiryRequest(BaseModel):
+    name: str
+    about_section: str | None = None
+    job_posting: str
+
+# FastAPI Route for Task 2
+@app.post("/task2/job-inquiry")
+def create_job_inquiry(request: LinkedInJobInquiryRequest):
+    """
+    Endpoint to generate a LinkedIn connection request for a job inquiry.
+    Expects JSON with 'name', optional 'about_section', and 'job_posting'.
+    """
+    generated_message = linkedin_job_inquiry_request(
+        name=request.name,
+        about_section=request.about_section or "",
+        job_posting=request.job_posting
     )
     return {
         "message": generated_message,
