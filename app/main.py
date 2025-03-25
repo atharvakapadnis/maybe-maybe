@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from app.database import SessionLocal, init_db
 from mcp.fastmcp import FastMCP
+from sqlalchemy import text
 
 # Initialize the FastAPI app
 app = FastAPI()
@@ -25,5 +26,5 @@ def read_root():
 @app.get("/test-db")
 def test_db(db:Session = Depends(get_db)):
     # Simple test to check connection
-    result = db.execute("SELECT 1").scalar()
+    result = db.execute(text("SELECT 1")).scalar()
     return {"db_connection":result}
