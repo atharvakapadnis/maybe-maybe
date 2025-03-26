@@ -11,12 +11,6 @@ load_dotenv()
 # Create a global OpenAI Client with your API key
 client = openai.Client(api_key=os.getenv("OPENAI_API_KEY"))
 
-# def mcp_tool_decorator(func):
-#     """
-#     Example decorator if your 'mcp.tool()' is not directly importable.
-#     Adjust as needed if you already have @mcp.tool() available.
-#     """
-#     return func
 mcp = FastMCP("Agentic Tasks")
 
 @mcp.tool()
