@@ -1,6 +1,7 @@
 import os
 import openai
 from dotenv import load_dotenv
+from mcp.fastmcp import FastMCP
 
 # Load environment variables (OPENAI_API_KEY, etc.)
 load_dotenv()
@@ -8,6 +9,9 @@ load_dotenv()
 # Create a global OpenAI Client with your API key
 client = openai.Client(api_key=os.getenv("OPENAI_API_KEY"))
 
+mcp = FastMCP("Agentic Tasks")
+
+@mcp.tool()
 def generate_linkedin_connection_request(name: str, about_section: str = "") -> str:
     """
     Generates a short LinkedIn connection request (<300 characters)
@@ -26,7 +30,7 @@ Ensure it's under 300 characters.
 
     # Call the Chat Completions endpoint
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",  # or "gpt-4", "gpt-3.5-turbo-16k", etc.
+        model="gpt-4o-mini",  
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": user_content}

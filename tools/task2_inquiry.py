@@ -11,14 +11,15 @@ load_dotenv()
 # Create a global OpenAI Client with your API key
 client = openai.Client(api_key=os.getenv("OPENAI_API_KEY"))
 
-def mcp_tool_decorator(func):
-    """
-    Example decorator if your 'mcp.tool()' is not directly importable.
-    Adjust as needed if you already have @mcp.tool() available.
-    """
-    return func
+# def mcp_tool_decorator(func):
+#     """
+#     Example decorator if your 'mcp.tool()' is not directly importable.
+#     Adjust as needed if you already have @mcp.tool() available.
+#     """
+#     return func
+mcp = FastMCP("Agentic Tasks")
 
-@mcp_tool_decorator
+@mcp.tool()
 def linkedin_job_inquiry_request(name: str, about_section: str = "", job_posting: str = "") -> str:
     """
     Generates a short LinkedIn job inquiry request (<300 characters).
