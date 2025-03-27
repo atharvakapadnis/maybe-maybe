@@ -1,5 +1,7 @@
 import os
-from fastapi import FastAPI, Depends, Body
+import io
+from fastapi import FastAPI, Depends, Body, UploadFile, File, Form
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import SessionLocal, init_db
@@ -7,6 +9,7 @@ from mcp.fastmcp import FastMCP
 from sqlalchemy import text
 from dotenv import load_dotenv
 import openai
+import PyPDF2
 
 #Import Tools
 from tools.task1_connection import generate_linkedin_connection_request
@@ -21,7 +24,7 @@ app = FastAPI()
 # Create databse tables on startup
 init_db()
 # Initialize MCP server for Agentic tasks
-mcp = FastMCP("AgenticTasks")
+mcp = FastMCP("Agentic Tasks")
 
 # Dependency to get DB session
 def get_db():
@@ -98,3 +101,31 @@ def resume_optimization_endpoint(request: ResumeOptimizationRequest):
         job_description=request.job_description
     )
     return {"suggestions": suggestions}
+
+# New endpoint for PDF-based resume optimization
+@app.post("/task3/resume-optimization-pdf")
+async def resume_optimization_pdf(
+    resume_file: UploadFile = File(...),
+    job_description: str = Form(...)
+):
+    """
+    Accepts a PDF file for the resume and a job description.
+    Extracts text from the PDF and generates optimization suggestions.
+    """
+    try:
+        file_contents = await resume_file.read()
+
+        # Use PyPDF2 to extract text
+        reader = PyPDF2.PdfReader(io.BytesIO(file_contents))
+        extracted_text = ""
+        for page in reader.pages:
+            extracted_text += page.extract_text() or ""
+
+            # Generate suggestions using the extracted text and job description
+            suggestions = resume_optimization(
+                resume_text=extracted_text,
+                job_description=job_description
+            )
+            return {"suggestions": suggestions}
+    except Exception as e:
+        return JSONResponse(status_code = 500, content={"error": str(e)})
