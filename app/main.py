@@ -11,6 +11,7 @@ import openai
 #Import Tools
 from tools.task1_connection import generate_linkedin_connection_request
 from tools.task2_inquiry import linkedin_job_inquiry_request
+from tools.task3_resume_optimization import resume_optimization
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -83,3 +84,17 @@ def create_job_inquiry(request: LinkedInJobInquiryRequest):
         "message": generated_message,
         "length": len(generated_message)
     }
+
+# Pydantic model for task Task 3
+class ResumeOptimizationRequest(BaseModel):
+    resume_text: str
+    job_description: str
+
+# FastAPI Route for Task 3
+@app.post("/task3/resume-optimization")
+def resume_optimization_endpoint(request: ResumeOptimizationRequest):
+    suggestions = resume_optimization(
+        resume_text=request.resume_text,
+        job_description=request.job_description
+    )
+    return {"suggestions": suggestions}
