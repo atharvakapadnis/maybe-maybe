@@ -15,6 +15,7 @@ import PyPDF2
 from tools.task1_connection import generate_linkedin_connection_request
 from tools.task2_inquiry import linkedin_job_inquiry_request
 from tools.task3_resume_optimization import resume_optimization
+from tools.task4_cover_letter import generate_cover_letter_initial, generate_cover_letter_final
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -129,3 +130,40 @@ async def resume_optimization_pdf(
             return {"suggestions": suggestions}
     except Exception as e:
         return JSONResponse(status_code = 500, content={"error": str(e)})
+    
+# Pydantic model for initial cover letter requet
+class CoverLetterRequest(BaseModel):
+    resume_text: str
+    job_description: str
+
+@app.post("/task4/cover-letter")
+def cover_letter_initial_endpoint(request: CoverLetterRequest):
+    """
+    Endpoint to generate a personalized cover letter.
+    Returns either:
+      - A cover letter (if sufficient context is provided), OR
+      - A set of follow-up questions (if critical context is missing).
+    """
+    result = generate_cover_letter_initial(
+        resume_text=request.resume_text,
+        job_description=request.job_description
+    )
+    return result
+
+#Pydantic modell for final cover letter request
+class CoverLetterFinalRequest(BaseModel):
+    resume_text: str
+    job_description: str
+    follow_up_answers: str  # Answers provided by the user to the follow-up questions
+
+@app.post("/task4/cover-letter-complete")
+def cover_letter_final_endpoint(request: CoverLetterFinalRequest):
+    """
+    Endpoint to generate the final cover letter after receiving follow-up answers.
+    """
+    cover_letter = generate_cover_letter_final(
+        resume_text=request.resume_text,
+        job_description=request.job_description,
+        follow_up_answers=request.follow_up_answers
+    )
+    return {"cover_letter": cover_letter, "length": len(cover_letter)}
