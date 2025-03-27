@@ -1,7 +1,6 @@
 import os
 import json
 import openai
-import io
 from dotenv import load_dotenv
 from mcp.fastmcp import FastMCP
 
@@ -46,7 +45,7 @@ Respond as described.
             {"role": "system", "content": "You are a helpful assistant that generates cover letters or follow-up questions."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.7,
+        temperature=0.7
     )
     output = response.choices[0].message.content.strip()
     if output.startswith("FOLLOW-UP:"):
@@ -56,7 +55,12 @@ Respond as described.
             questions = json.loads(questions_str)
             return {"follow_up_needed": True, "questions": questions}
         except Exception:
-            return {"follow_up_needed": True, "questions": ["Please provide additional context such as your interest in the role, preferred tone, and key projects to emphasize."]}
+            return {"follow_up_needed": True, "questions": [
+                "What draws you to this company or role personally?",
+                "Are there any projects from your resume you’d like to emphasize more?",
+                "What tone do you prefer — professional, friendly, or passionate?",
+                "Are there any achievements or skills you’d like highlighted more?"
+            ]}
     else:
         return {"cover_letter": output}
 
@@ -87,13 +91,12 @@ Additional Context (follow-up answers):
 Generate the cover letter accordingly.
     """
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that writes personalized cover letters."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.7,
-        max_tokens=300
+        temperature=0.7
     )
     cover_letter = response.choices[0].message.content.strip()
     return cover_letter

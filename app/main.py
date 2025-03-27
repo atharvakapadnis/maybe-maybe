@@ -131,39 +131,45 @@ async def resume_optimization_pdf(
     except Exception as e:
         return JSONResponse(status_code = 500, content={"error": str(e)})
     
-# Pydantic model for initial cover letter requet
+# Pydantic model for integrated cover letter task
 class CoverLetterRequest(BaseModel):
     resume_text: str
     job_description: str
+    follow_up_answers: str | None = None
 
+# Fast API route for Task 4
 @app.post("/task4/cover-letter")
-def cover_letter_initial_endpoint(request: CoverLetterRequest):
+def integrated_cover_letter_endpoint(request: CoverLetterRequest):
     """
-    Endpoint to generate a personalized cover letter.
-    Returns either:
-      - A cover letter (if sufficient context is provided), OR
-      - A set of follow-up questions (if critical context is missing).
+    Single endpoint to handle cover letter generation.
+    If 'follow_up_answers' is provided, generates the final cover letter.
+    If not, generates an initial response which may be a cover letter or a set of follow-up questions.
     """
-    result = generate_cover_letter_initial(
-        resume_text=request.resume_text,
-        job_description=request.job_description
-    )
-    return result
-
-#Pydantic modell for final cover letter request
-class CoverLetterFinalRequest(BaseModel):
-    resume_text: str
-    job_description: str
-    follow_up_answers: str  # Answers provided by the user to the follow-up questions
-
-@app.post("/task4/cover-letter-complete")
-def cover_letter_final_endpoint(request: CoverLetterFinalRequest):
-    """
-    Endpoint to generate the final cover letter after receiving follow-up answers.
-    """
-    cover_letter = generate_cover_letter_final(
-        resume_text=request.resume_text,
-        job_description=request.job_description,
-        follow_up_answers=request.follow_up_answers
-    )
-    return {"cover_letter": cover_letter, "length": len(cover_letter)}
+    if request.follow_up_answers is None:
+        # Call the initial tool function to check context
+        result = generate_cover_letter_initial(
+            resume_text=request.resume_text,
+            job_description=request.job_description
+        )
+        # If follow-up is needed, return the questions; otherwise, return the cover letter.
+        if result.get("follow_up_needed"):
+            return {
+                "follow_up_needed": True,
+                "questions": result.get("questions", [])
+            }
+        else:
+            return {
+                "cover_letter": result.get("cover_letter"),
+                "length": len(result.get("cover_letter", ""))
+            }
+    else:
+        # Final cover letter generation using provided follow-up answers
+        cover_letter = generate_cover_letter_final(
+            resume_text=request.resume_text,
+            job_description=request.job_description,
+            follow_up_answers=request.follow_up_answers
+        )
+        return {
+            "cover_letter": cover_letter,
+            "length": len(cover_letter)
+        }
