@@ -1,5 +1,7 @@
 import os
 import io
+import openai
+import PyPDF2
 from fastapi import FastAPI, Depends, Body, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -8,8 +10,6 @@ from app.database import SessionLocal, init_db
 from mcp.fastmcp import FastMCP
 from sqlalchemy import text
 from dotenv import load_dotenv
-import openai
-import PyPDF2
 
 #Import Tools
 from tools.task1_connection import generate_linkedin_connection_request
@@ -89,21 +89,7 @@ def create_job_inquiry(request: LinkedInJobInquiryRequest):
         "length": len(generated_message)
     }
 
-# Pydantic model for task Task 3
-class ResumeOptimizationRequest(BaseModel):
-    resume_text: str
-    job_description: str
-
 # FastAPI Route for Task 3
-@app.post("/task3/resume-optimization")
-def resume_optimization_endpoint(request: ResumeOptimizationRequest):
-    suggestions = resume_optimization(
-        resume_text=request.resume_text,
-        job_description=request.job_description
-    )
-    return {"suggestions": suggestions}
-
-# New endpoint for PDF-based resume optimization
 @app.post("/task3/resume-optimization-pdf")
 async def resume_optimization_pdf(
     resume_file: UploadFile = File(...),
