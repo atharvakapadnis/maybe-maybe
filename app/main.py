@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import SessionLocal, init_db
-from mcp.fastmcp import FastMCP
+from mcp.client import mcp_instance
 from sqlalchemy import text
 from dotenv import load_dotenv
 
@@ -24,8 +24,6 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 app = FastAPI()
 # Create databse tables on startup
 init_db()
-# Initialize MCP server for Agentic tasks
-mcp = FastMCP("Agentic Tasks")
 
 # Dependency to get DB session
 def get_db():

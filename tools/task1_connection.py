@@ -1,15 +1,13 @@
 import os
 import openai
 from dotenv import load_dotenv
-from mcp.fastmcp import FastMCP
+from mcp.client import mcp_instance as mcp
 
 # Load environment variables (OPENAI_API_KEY, etc.)
 load_dotenv()
 
 # Create a global OpenAI Client with your API key
 client = openai.Client(api_key=os.getenv("OPENAI_API_KEY"))
-
-mcp = FastMCP("Agentic Tasks")
 
 @mcp.tool()
 def generate_linkedin_connection_request(name: str, about_section: str = "") -> str:

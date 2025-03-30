@@ -1,16 +1,13 @@
 import os
 import openai
 from dotenv import load_dotenv
-from mcp.fastmcp import FastMCP
+from mcp.client import mcp_instance as mcp
 
 # Load environment variables
 load_dotenv()
 
 # Create a global OpenAI Client
 client = openai.Client(api_key = os.getenv("OPENAI_API_KEY"))
-
-# Initialize MCP
-mcp = FastMCP("Agentic Tasks")
 
 @mcp.tool()
 def resume_optimization(resume_text: str, job_description: str) -> str:
