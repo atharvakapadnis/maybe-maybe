@@ -2,16 +2,13 @@ import os
 import json
 import openai
 from dotenv import load_dotenv
-from mcp.fastmcp import FastMCP
+from mcp.client import mcp_instance as mcp
 
 # Load environment variables (including OPENAI_API_KEY)
 load_dotenv()
 
 # Create a global OpenAI Client using the new client interface (>=1.0.0)
 client = openai.Client(api_key=os.getenv("OPENAI_API_KEY"))
-
-# Initialize MCP instance
-mcp = FastMCP("AgenticTasks")
 
 @mcp.tool()
 def generate_cover_letter_initial(resume_text: str, job_description: str) -> dict:
