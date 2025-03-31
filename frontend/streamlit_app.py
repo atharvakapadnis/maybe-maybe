@@ -75,3 +75,22 @@ if st.session_state.new_application:
         st.write("Job Title:", st.session_state.job_title)
         if "resume_file" in st.session_state:
             st.write("Resume PDF uploaded succsesfully.")
+
+st.markdown("---")
+st.markdown("## Next Steps")
+
+# Create three columns for the buttons
+col1, col2, col3 = st.columns(3)
+
+if col1.button("Resume Suggestions"):
+    # For now, simply display a message
+    st.write("Parsing current application data to Task 3 (Resume Optimization)...")
+    # (Later, you can call the Task 3 endpoint using the session data, e.g., st.session_state.resume_file, st.session_state.job_description, st.session_state.company, st.session_state.job_title)
+
+if col2.button("Cover Letter Generation"):
+    st.write("Parsing current application data to Task 4 (Cover Letter Generation)...")
+    # (Later, this will call the Task 4 endpoint using the stored resume text, job description, company, and job title)
+
+if col3.button("Insider Connection Request"):
+    st.write("Parsing current application data to Task 2 (LinkedIn Job Inquiry Request)...")
+    # (Later, this will trigger the Task 2 endpoint using the stored job application details and the person's info)
