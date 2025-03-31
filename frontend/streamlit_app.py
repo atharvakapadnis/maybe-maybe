@@ -41,6 +41,37 @@ if task1_submitted:
 
 # --- Separator and New Job Application Button ---
 st.markdown("---")
-if st.button("Start a new job application"):
-    st.markdown("### Job Application Flow (Coming Soon)")
-    st.write("Tasks 2, 3, and 4 for job applications will be implemented in the next phase of development.")
+# ------------------------------------------
+# Job Application Setup using st.session_state
+# ------------------------------------------
+# Initialize session state for new application if not already set
+if "new_application" not in st.session_state:
+    st.session_state.new_application = False
+
+# Button to start new job application setup
+if not st.session_state.new_application:
+    if st.button("Start a new job application"):
+        st.session_state.new_application = True
+
+# Once new_application is True, show the application details form
+if st.session_state.new_application:
+    st.markdown("### Job Details")
+    st.write("Enter common job application details that will be used for generating resume suggestions, drafting cover letter and connection requests. ")
+    with st.form("job_application_form"):
+        job_description = st.text_area("Enter Job Description:", height=150)
+        company = st.text_input("Enter Company Name:")
+        job_title = st.text_input("Enter Job Title:")
+        resume_file = st.file_uploader("Upload Resume (PDF):", type=["pdf"])
+        submitted_app = st.form_submit_button("Save Application Details")
+    
+    if submitted_app:
+        st.session_state.job_description = job_description
+        st.session_state.company = company
+        st.session_state.job_title = job_title
+        st.success("Job application details saved!")
+        st.markdown("#### Saved Application Details")
+        st.write("Job Description:", st.session_state.job_description)
+        st.write("Company:", st.session_state.company)
+        st.write("Job Title:", st.session_state.job_title)
+        if "resume_file" in st.session_state:
+            st.write("Resume PDF uploaded succsesfully.")
