@@ -55,11 +55,11 @@ if not st.session_state.new_application:
 
 # Once new_application is True, show the application details form
 if st.session_state.new_application:
-    st.markdown("### Job Details")
-    st.write("Enter common job application details that will be used for generating resume suggestions, drafting cover letter and connection requests. ")
+    st.markdown("### New Job Application Setup")
+    st.write("Enter common job application details that will be used for Tasks 2, 3, and 4.")
     with st.form("job_application_form"):
         job_description = st.text_area("Enter Job Description:", height=150)
-        company = st.text_input("Enter Company Name:")
+        company = st.text_input("Enter Company:")
         job_title = st.text_input("Enter Job Title:")
         resume_file = st.file_uploader("Upload Resume (PDF):", type=["pdf"])
         submitted_app = st.form_submit_button("Save Application Details")
@@ -68,29 +68,66 @@ if st.session_state.new_application:
         st.session_state.job_description = job_description
         st.session_state.company = company
         st.session_state.job_title = job_title
+        if resume_file is not None:
+            st.session_state.resume_file = resume_file.getvalue()  # Save PDF bytes
         st.success("Job application details saved!")
         st.markdown("#### Saved Application Details")
         st.write("Job Description:", st.session_state.job_description)
         st.write("Company:", st.session_state.company)
         st.write("Job Title:", st.session_state.job_title)
         if "resume_file" in st.session_state:
-            st.write("Resume PDF uploaded succsesfully.")
+            st.write("Resume PDF uploaded: Yes")
 
-st.markdown("---")
-st.markdown("## Next Steps")
+    # Show the three buttons only if application details are saved
+    if (
+        st.session_state.get("job_description")
+        and st.session_state.get("company")
+        and st.session_state.get("job_title")
+        and st.session_state.get("resume_file")
+    ):
+        st.markdown("---")
+        st.markdown("## Next Steps for Your Job Application")
+        col1, col2, col3 = st.columns(3)
 
-# Create three columns for the buttons
-col1, col2, col3 = st.columns(3)
+        # Task 3: Resume Suggestions Integration
+        if col1.button("Resume Suggestions"):
+            st.write("Parsing current application data to Task 3 (Resume Optimization)...")
+            files = {
+                "resume_file": (
+                    "resume.pdf",
+                    st.session_state.resume_file,
+                    "application/pdf"
+                )
+            }
+            data = {
+                "job_description": st.session_state.job_description,
+                "company": st.session_state.company,
+                "job_title": st.session_state.job_title,
+                "date_applied": ""  # optional: can be set if needed
+            }
+            try:
+                response = requests.post(
+                    f"{BASE_URL}/task3/resume-optimization-pdf", files=files, data=data
+                )
+                if response.status_code == 200:
+                    result = response.json()
+                    st.success("Resume Optimization Suggestions:")
+                    st.write(result["suggestions"])
+                    st.info(
+                        f"Job Application ID: {result['job_application_id']}, "
+                        f"Resume Suggestion ID: {result['resume_suggestion_id']}"
+                    )
+                else:
+                    st.error("Error optimizing resume. Please try again.")
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
 
-if col1.button("Resume Suggestions"):
-    # For now, simply display a message
-    st.write("Parsing current application data to Task 3 (Resume Optimization)...")
-    # (Later, you can call the Task 3 endpoint using the session data, e.g., st.session_state.resume_file, st.session_state.job_description, st.session_state.company, st.session_state.job_title)
+        # Task 4: Cover Letter Generation (placeholder for now)
+        if col2.button("Cover Letter Generation"):
+            st.write("Parsing current application data to Task 4 (Cover Letter Generation)...")
+            # Integration will be similar to Task 3, calling /task4/cover-letter endpoint
 
-if col2.button("Cover Letter Generation"):
-    st.write("Parsing current application data to Task 4 (Cover Letter Generation)...")
-    # (Later, this will call the Task 4 endpoint using the stored resume text, job description, company, and job title)
-
-if col3.button("Insider Connection Request"):
-    st.write("Parsing current application data to Task 2 (LinkedIn Job Inquiry Request)...")
-    # (Later, this will trigger the Task 2 endpoint using the stored job application details and the person's info)
+        # Task 2: Insider Connection Request (placeholder for now)
+        if col3.button("Insider Connection Request"):
+            st.write("Parsing current application data to Task 2 (LinkedIn Job Inquiry Request)...")
+            # Integration will call /task2/job-inquiry endpoint with stored application details
