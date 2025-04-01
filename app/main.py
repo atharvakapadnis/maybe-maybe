@@ -1,18 +1,18 @@
 import os
 import io
-import openai
-import PyPDF2
 import datetime
+import PyPDF2
 from fastapi import FastAPI, Depends, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy import text
 from sqlalchemy.orm import Session
-from app.database import SessionLocal, init_db
-from mcp.client import mcp_instance
+from sqlalchemy import text
 from dotenv import load_dotenv
+import openai
 
-#Import Tools
+from app.database import SessionLocal, init_db
+from mcp.client import mcp_instance as mcp
+
 from tools.task1_connection import generate_linkedin_connection_request
 from tools.task2_inquiry import linkedin_job_inquiry_request
 from tools.task3_resume_optimization import resume_optimization
@@ -23,12 +23,9 @@ from models.models import Person, JobApplication, ResumeSuggestion, CoverLetter,
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Initialize the FastAPI app
 app = FastAPI()
-# Create databse tables on startup
 init_db()
 
-# Dependency to get DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -41,33 +38,29 @@ def read_root():
     return {"message": "Welcome to Agentic Tasks API"}
 
 @app.get("/test-db")
-def test_db(db:Session = Depends(get_db)):
-    # Simple test to check connection
+def test_db(db: Session = Depends(get_db)):
     result = db.execute(text("SELECT 1")).scalar()
-    return {"db_connection":result}
+    return {"db_connection": result}
 
-# Pydantic model for taks 1
+# ---------------------------
+# Task 1: LinkedIn Connection Request (Person Table)
+# ---------------------------
 class LinkedInRequest(BaseModel):
-    name:str
+    name: str
     role: str
     company: str
     about_section: str | None = None
 
-# FastAPI Route for Task 1
 @app.post("/task1/linkedin-request")
 def create_linkedin_request_endpoint(request: LinkedInRequest, db: Session = Depends(get_db)):
-    """
-    Endpoint to generate a LinkedIn connection request.
-    Expects JSON with 'name' and optional 'about_section'.
-    """
     generated_message = generate_linkedin_connection_request(
         name=request.name,
         about_section=request.about_section or ""
     )
     person = Person(
-        name = request.name,
-        role=request.role,
-        company=request.company,
+        contact_name=request.name,
+        contact_role=request.role,
+        contact_company=request.company,
         message_sent=generated_message
     )
     db.add(person)
@@ -79,7 +72,9 @@ def create_linkedin_request_endpoint(request: LinkedInRequest, db: Session = Dep
         "length": len(generated_message)
     }
 
-# Pydantic model for task 2
+# ---------------------------
+# Task 2: LinkedIn Job Inquiry Request (JobInquiry Table)
+# ---------------------------
 class LinkedInJobInquiryRequest(BaseModel):
     name: str
     role: str
@@ -87,45 +82,30 @@ class LinkedInJobInquiryRequest(BaseModel):
     about_section: str | None = None
     job_posting: str
 
-# FastAPI Route for Task 2
 @app.post("/task2/job-inquiry")
-def create_job_inquiry(request: LinkedInJobInquiryRequest, db:Session = Depends(get_db)):
-    """
-    Endpoint to generate a LinkedIn connection request for a job inquiry.
-    Expects JSON with 'name', optional 'about_section', and 'job_posting'.
-    """
+def create_job_inquiry(request: LinkedInJobInquiryRequest, db: Session = Depends(get_db)):
     generated_message = linkedin_job_inquiry_request(
         name=request.name,
         about_section=request.about_section or "",
         job_posting=request.job_posting
     )
-    # Check if the person already exists
-    person = db.query(Person).filter(Person.name == request.name, Person.company == request.company).first()
-    if not person:
-        person = Person(
-            name=request.name,
-            role=request.role,
-            company=request.company,
-            message_sent=""
-        )
-        db.add(person)
-        db.commit()
-        db.refresh(person)
-    # Create a JobApplication record using the job posting as job_description; using a default job_title.
+    # Create a new JobApplication record
     job_app = JobApplication(
         company=request.company,
-        job_title="Job Inquiry",
+        job_title="Job Inquiry",  # Default title for inquiry applications
         job_description=request.job_posting,
-        date_applied=datetime.date.today()
+        date_applied=datetime.datetime.utcnow()
     )
     db.add(job_app)
     db.commit()
     db.refresh(job_app)
-    # Create a JobInquiry record linking the person and job application
+    
+    # Create a new JobInquiry record referencing the JobApplication
     job_inquiry = JobInquiry(
-        person_id=person.id,
         job_application_id=job_app.id,
-        date_reached_out=datetime.date.today(),
+        contact_name=request.name,
+        contact_role=request.role,
+        date_reached_out=datetime.datetime.utcnow(),
         message_sent=generated_message
     )
     db.add(job_inquiry)
@@ -137,20 +117,19 @@ def create_job_inquiry(request: LinkedInJobInquiryRequest, db:Session = Depends(
         "length": len(generated_message)
     }
 
-# FastAPI Route for Task 3
-@app.post("/task3/resume-optimization-pdf")
+# ---------------------------
+# Task 3: Resume Optimization Suggestions (ResumeSuggestion Table)
+# ---------------------------
+# This endpoint accepts a PDF file for the resume.
+@app.post("/task3/resume-optimization")
 async def resume_optimization_pdf(
     resume_file: UploadFile = File(...),
     job_description: str = Form(...),
     company: str = Form(...),
     job_title: str = Form(...),
-    date_applied: str = Form(None),  # Format YYYY-MM-DD; optional
+    date_applied: str = Form(None),  # Format: YYYY-MM-DD, optional
     db: Session = Depends(get_db)
 ):
-    """
-    Accepts a PDF file for the resume and a job description.
-    Extracts text from the PDF and generates optimization suggestions.
-    """
     try:
         file_contents = await resume_file.read()
         pdf_stream = io.BytesIO(file_contents)
@@ -164,12 +143,10 @@ async def resume_optimization_pdf(
             resume_text=extracted_text,
             job_description=job_description
         )
-        # Parse date_applied or default to today
         if date_applied:
-            date_obj = datetime.datetime.strptime(date_applied, "%Y-%m-%d").date()
+            date_obj = datetime.datetime.strptime(date_applied, "%Y-%m-%d")
         else:
-            date_obj = datetime.date.today()
-        # Create a new JobApplication record
+            date_obj = datetime.datetime.utcnow()
         job_app = JobApplication(
             company=company,
             job_title=job_title,
@@ -179,7 +156,6 @@ async def resume_optimization_pdf(
         db.add(job_app)
         db.commit()
         db.refresh(job_app)
-        # Create a ResumeSuggestion record linked to the job application
         resume_sugg = ResumeSuggestion(
             job_application_id=job_app.id,
             suggestions=suggestions
@@ -194,7 +170,11 @@ async def resume_optimization_pdf(
         }
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
-    
+
+# ---------------------------
+# Task 4: Cover Letter Generation (CoverLetter Table)
+# ---------------------------
+# For this endpoint, we accept a PDF resume and additional context if needed.
 @app.post("/task4/cover-letter")
 async def cover_letter_endpoint(
     resume_file: UploadFile = File(...),
@@ -204,16 +184,7 @@ async def cover_letter_endpoint(
     follow_up_answers: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    """
-    Generates a personalized cover letter using an uploaded PDF resume.
-    - Extracts text from the PDF resume.
-    - If follow_up_answers is not provided, calls the initial cover letter generation function.
-      • If additional context is needed, returns follow-up questions.
-    - If follow_up_answers is provided, calls the final cover letter generation function.
-    - Saves the generated cover letter and associated JobApplication record in the database.
-    """
     try:
-        # Read and extract text from the PDF resume
         file_contents = await resume_file.read()
         pdf_stream = io.BytesIO(file_contents)
         reader = PyPDF2.PdfReader(pdf_stream)
@@ -222,8 +193,6 @@ async def cover_letter_endpoint(
             text_page = page.extract_text()
             if text_page:
                 resume_text += text_page
-        
-        # Generate cover letter based on available context
         if not follow_up_answers:
             result = generate_cover_letter_initial(
                 resume_text=resume_text,
@@ -239,18 +208,16 @@ async def cover_letter_endpoint(
                 job_description=job_description,
                 follow_up_answers=follow_up_answers
             )
-        
-        # Save the generated cover letter into the database
+        # Save cover letter and associated job application in the database.
         job_app = JobApplication(
             company=company,
             job_title=job_title,
             job_description=job_description,
-            date_applied=datetime.date.today()
+            date_applied=datetime.datetime.utcnow()
         )
         db.add(job_app)
         db.commit()
         db.refresh(job_app)
-        
         cover_letter_record = CoverLetter(
             job_application_id=job_app.id,
             cover_letter=cover_letter_text
@@ -258,7 +225,6 @@ async def cover_letter_endpoint(
         db.add(cover_letter_record)
         db.commit()
         db.refresh(cover_letter_record)
-        
         return {
             "cover_letter": cover_letter_text,
             "job_application_id": job_app.id,
