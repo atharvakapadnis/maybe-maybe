@@ -1,21 +1,20 @@
+# tools/task4_cover_letter.py
+
 import os
 import json
 import openai
 from dotenv import load_dotenv
 from mcp.client import mcp_instance as mcp
 
-# Load environment variables (including OPENAI_API_KEY)
 load_dotenv()
-
-# Create a global OpenAI Client using the new client interface (>=1.0.0)
 client = openai.Client(api_key=os.getenv("OPENAI_API_KEY"))
 
 @mcp.tool()
 def generate_cover_letter_initial(resume_text: str, job_description: str) -> dict:
     """
-    Checks if sufficient context is provided to generate a personalized cover letter.
-    If sufficient, returns the cover letter.
-    If not, returns follow-up questions in a JSON array.
+    Given a resume and job description, decide whether there's sufficient context
+    to generate a personalized cover letter. If sufficient, return the cover letter.
+    If not, return follow-up questions as a JSON array.
     """
     prompt = f"""
 You are an expert cover letter writer. Given the resume and job description below, decide whether all necessary context for writing a personalized cover letter is provided.
@@ -24,7 +23,7 @@ Necessary context includes:
 - The user's tone preference (e.g., professional, friendly, passionate).
 - Specific projects or achievements to emphasize.
 
-If all necessary context is provided, output the cover letter in plain text (max 1 page) that includes the portfolio link: https://atharvakapadnis.vercel.app.
+If sufficient context is provided, output the cover letter in plain text (max 1 page) that includes the portfolio link: https://atharvakapadnis.vercel.app.
 If any critical context is missing, output exactly: "FOLLOW-UP:" followed by a JSON array of follow-up questions.
 Do not include any extra text.
 
@@ -46,7 +45,6 @@ Respond as described.
     )
     output = response.choices[0].message.content.strip()
     if output.startswith("FOLLOW-UP:"):
-        # Parse the JSON array following "FOLLOW-UP:"
         try:
             questions_str = output[len("FOLLOW-UP:"):].strip()
             questions = json.loads(questions_str)
