@@ -41,9 +41,6 @@ if task1_submitted:
 
 # --- Separator and New Job Application Button ---
 st.markdown("---")
-# ------------------------------------------
-# Job Application Setup using st.session_state
-# ------------------------------------------
 # Initialize session state for new application if not already set
 if "new_application" not in st.session_state:
     st.session_state.new_application = False
@@ -103,7 +100,7 @@ if st.session_state.new_application:
                 "job_description": st.session_state.job_description,
                 "company": st.session_state.company,
                 "job_title": st.session_state.job_title,
-                "date_applied": ""  # optional: can be set if needed
+                "date_applied": ""  # optional
             }
             try:
                 response = requests.post(
@@ -189,6 +186,42 @@ if st.session_state.new_application:
                     st.error(f"An error occurred: {e}")
 
         # Task 2: Insider Connection Request (placeholder for now)
+        if "show_task2_form" not in st.session_state:
+            st.session_state.show_task2_form = False
+
+    # When the user clicks the button, set the flag to show the form
         if col3.button("Insider Connection Request"):
-            st.write("Parsing current application data to Task 2 (LinkedIn Job Inquiry Request)...")
-            # Integration will call /task2/job-inquiry endpoint with stored application details
+            st.session_state.show_task2_form = True
+
+        # If the flag is True, show the Task 2 form
+        if st.session_state.get("show_task2_form"):
+            st.markdown("### Insider Connection Request Details")
+            with st.form("task2_form"):
+                contact_name = st.text_input("Contact Name:")
+                contact_role = st.text_input("Contact Role:")
+                contact_about = st.text_area("Contact About Section (Optional):", height=100)
+                # Pre-fill job posting with the saved job_description
+                contact_job_posting = st.text_area("Job Posting Details:", value=st.session_state.job_description, height=100)
+                submitted_task2 = st.form_submit_button("Generate Insider Connection Request")
+            if submitted_task2:
+                if not contact_name or not contact_role or not st.session_state.company or not contact_job_posting:
+                    st.error("Please fill in the required fields: Contact Name, Contact Role, Company, and Job Posting.")
+                else:
+                    payload = {
+                        "name": contact_name,
+                        "role": contact_role,
+                        "company": st.session_state.company,
+                        "about_section": contact_about,
+                        "job_posting": contact_job_posting
+                    }
+                    try:
+                        response = requests.post(f"{BASE_URL}/task2/job-inquiry", json=payload)
+                        if response.status_code == 200:
+                            result = response.json()
+                            st.success("Generated Insider Connection Request:")
+                            st.write(result["message"])
+                            st.info(f"Message Length: {result['length']} characters")
+                        else:
+                            st.error("Error generating job inquiry request. Please try again.")
+                    except Exception as e:
+                        st.error(f"An error occurred: {e}")
