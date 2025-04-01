@@ -124,8 +124,69 @@ if st.session_state.new_application:
 
         # Task 4: Cover Letter Generation (placeholder for now)
         if col2.button("Cover Letter Generation"):
-            st.write("Parsing current application data to Task 4 (Cover Letter Generation)...")
-            # Integration will be similar to Task 3, calling /task4/cover-letter endpoint
+            # Prepare files and form data using session_state values.
+            files = {
+                "resume_file": (
+                    "resume.pdf",
+                    st.session_state.resume_file,
+                    "application/pdf"
+                )
+            }
+            data = {
+                "job_description": st.session_state.job_description,
+                "company": st.session_state.company,
+                "job_title": st.session_state.job_title,
+                "follow_up_answers": ""  # initially empty
+            }
+            try:
+                # Call the Task 4 endpoint with no follow-up answers
+                response = requests.post(f"{BASE_URL}/task4/cover-letter", files=files, data=data)
+                if response.status_code == 200:
+                    result = response.json()
+                    # If additional context is required, save intermediate state and display follow-up form.
+                    if result.get("follow_up_needed"):
+                        st.session_state.cover_letter_data = data
+                        st.session_state.cover_letter_files = files
+                        st.session_state.cover_letter_questions = result.get("questions", [])
+                        st.session_state.cover_letter_initial = True
+                    else:
+                        st.success("Generated Cover Letter:")
+                        st.write(result["cover_letter"])
+                        st.info(f"Cover Letter Length: {result['length']} characters")
+                else:
+                    st.error("Error generating cover letter. Please try again.")
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
+
+        # If the initial cover letter call indicated that follow-up is needed,
+        # display the follow-up questions and a form for additional context.
+        if st.session_state.get("cover_letter_initial") and st.session_state.get("cover_letter_questions"):
+            st.warning("Additional context is required for your cover letter:")
+            st.write("Follow-Up Questions:")
+            for question in st.session_state.cover_letter_questions:
+                st.write("- " + question)
+            with st.form("follow_up_form"):
+                follow_up = st.text_area("Enter additional context here:")
+                submitted_follow_up = st.form_submit_button("Submit Follow-Up Answers")
+            if submitted_follow_up:
+                # Update stored data with follow-up answers and re-call the endpoint.
+                st.session_state.cover_letter_data["follow_up_answers"] = follow_up
+                try:
+                    response2 = requests.post(f"{BASE_URL}/task4/cover-letter", files=st.session_state.cover_letter_files, data=st.session_state.cover_letter_data)
+                    if response2.status_code == 200:
+                        result2 = response2.json()
+                        st.success("Generated Cover Letter:")
+                        st.write(result2["cover_letter"])
+                        st.info(f"Cover Letter Length: {result2['length']} characters")
+                        # Clear stored follow-up state
+                        st.session_state.cover_letter_initial = False
+                        st.session_state.pop("cover_letter_data")
+                        st.session_state.pop("cover_letter_files")
+                        st.session_state.pop("cover_letter_questions")
+                    else:
+                        st.error("Error generating cover letter with follow-up answers. Please try again.")
+                except Exception as e:
+                    st.error(f"An error occurred: {e}")
 
         # Task 2: Insider Connection Request (placeholder for now)
         if col3.button("Insider Connection Request"):
