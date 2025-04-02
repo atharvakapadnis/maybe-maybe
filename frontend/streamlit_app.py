@@ -1,15 +1,18 @@
 import streamlit as st
 import requests
 
-# Base URL for your FastAPI backend (ensure your backend is running)
+# Base URL for your FastAPI backend (ensure your backend is running at this address)
 BASE_URL = "http://127.0.0.1:8000"
 
-st.title("Job Application Helper")
-st.write("This application is to help job seekers streamline some of the tasks they do on a regular basis.")
+# ================================
+# Page Title and Welcome Message
+# ================================
+st.title("Job Application Helper") 
+st.write("This application is designed to help job seekers streamline tasks like generating connection requests, optimizing resumes, and creating cover letters.")
 
-# ---------------------------
+# ================================
 # Task 1: General LinkedIn Connection Request
-# ---------------------------
+# ================================
 st.header("Generate a General LinkedIn Connection Request")
 with st.form("task1_form"):
     name = st.text_input("Enter Name:")
@@ -40,12 +43,13 @@ if task1_submitted:
         except Exception as e:
             st.error(f"An error occurred: {e}")
 
-# ---------------------------
-# Job Application Setup (This appears at the top)
-# ---------------------------
+# ================================
+# Job Application Setup - Save New Job Application
+# ================================
 st.markdown("---")
 st.header("Start a New Job Application")
-st.write("Enter the common job application details that will be used for Tasks 2, 3, and 4.")
+st.write("Enter common job application details. These will be used for Tasks 2, 3, and 4.")
+
 with st.form("job_application_form"):
     job_description = st.text_area("Enter Job Description:", height=150)
     app_company = st.text_input("Enter Company:")
@@ -58,24 +62,24 @@ if submitted_app:
     if not job_description or not app_company or not job_title or not resume_file:
         st.error("Please fill in all required fields and upload your resume PDF.")
     else:
-        # Create a new job application by calling the /job-application endpoint
+        # Call the /job-application endpoint to create a new job application record
         payload = {
             "job_description": job_description,
             "company": app_company,
             "job_title": job_title,
-            "date_applied": date_applied
+            "date_applied": date_applied  # If empty, backend will default
         }
         try:
             response = requests.post(f"{BASE_URL}/job-application", json=payload)
             if response.status_code == 200:
                 result = response.json()
                 st.success("Job application details saved!")
-                st.session_state.job_application = result  # Store returned job application details, including job_application_id
+                st.session_state.job_application = result  # Save full details
+                st.session_state.job_application_id = result.get("job_application_id")
                 st.session_state.job_description = result.get("job_description")
                 st.session_state.company = result.get("company")
                 st.session_state.job_title = result.get("job_title")
                 st.session_state.date_applied = result.get("date_applied")
-                st.session_state.job_application_id = result.get("job_application_id")
                 st.session_state.resume_file = resume_file.getvalue()  # Save PDF bytes
                 st.markdown("#### Saved Application Details")
                 st.write("Job Description:", st.session_state.job_description)
@@ -88,80 +92,97 @@ if submitted_app:
         except Exception as e:
             st.error(f"An error occurred: {e}")
 
-# ---------------------------
-# Next Steps: Display Task Buttons Only if Job Application is Saved
-# ---------------------------
-if (
-    st.session_state.get("job_application_id")
-    and st.session_state.get("resume_file")
-):
+# ================================
+# Next Steps: Show Task Buttons if Job Application is Saved
+# ================================
+if st.session_state.get("job_application_id") and st.session_state.get("resume_file"):
     st.markdown("---")
     st.markdown("## Next Steps for Your Job Application")
     col1, col2, col3 = st.columns(3)
 
-    # --- Task 3: Resume Optimization Suggestions ---
+    # ----- Task 3: Resume Optimization Suggestions -----
     if col1.button("Resume Suggestions"):
-        st.write("Processing Task 3 (Resume Optimization)...")
-        files = {
-            "resume_file": (
-                "resume.pdf",
-                st.session_state.resume_file,
-                "application/pdf"
+        # Check if cached suggestions exist
+        if st.session_state.get("resume_suggestions"):
+            st.success("Cached Resume Optimization Suggestions:")
+            st.write(st.session_state.resume_suggestions)
+            st.info(
+                f"Job Application ID: {st.session_state.job_application_id}, "
+                f"Resume Suggestion ID: {st.session_state.resume_suggestion_id}"
             )
-        }
-        # Use job_description from the saved job application
-        data = {
-            "job_application_id": st.session_state.job_application_id,
-            "job_description": st.session_state.job_description
-        }
-        try:
-            response = requests.post(f"{BASE_URL}/task3/resume-optimization", files=files, data=data)
-            if response.status_code == 200:
-                result = response.json()
-                st.success("Resume Optimization Suggestions:")
-                st.write(result["suggestions"])
-                st.info(f"Job Application ID: {result['job_application_id']}, Resume Suggestion ID: {result['resume_suggestion_id']}")
-            else:
-                st.error("Error optimizing resume. Please try again.")
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
-
-    # --- Task 4: Cover Letter Generation ---
-    if col2.button("Cover Letter Generation"):
-        files = {
-            "resume_file": (
-                "resume.pdf",
-                st.session_state.resume_file,
-                "application/pdf"
-            )
-        }
-        data = {
-            "job_application_id": st.session_state.job_application_id,
-            "job_description": st.session_state.job_description,
-            "company": st.session_state.company,
-            "job_title": st.session_state.job_title,
-            "follow_up_answers": ""  # initially empty
-        }
-        try:
-            response = requests.post(f"{BASE_URL}/task4/cover-letter", files=files, data=data)
-            if response.status_code == 200:
-                result = response.json()
-                if result.get("follow_up_needed"):
-                    st.session_state.cover_letter_data = data
-                    st.session_state.cover_letter_files = files
-                    st.session_state.cover_letter_questions = result.get("questions", [])
-                    st.session_state.cover_letter_initial = True
+        else:
+            st.write("Processing Task 3 (Resume Optimization)...")
+            files = {
+                "resume_file": (
+                    "resume.pdf",
+                    st.session_state.resume_file,
+                    "application/pdf"
+                )
+            }
+            data = {
+                "job_application_id": st.session_state.job_application_id,
+                "job_description": st.session_state.job_description
+            }
+            try:
+                response = requests.post(f"{BASE_URL}/task3/resume-optimization", files=files, data=data)
+                if response.status_code == 200:
+                    result = response.json()
+                    st.session_state.resume_suggestions = result["suggestions"]
+                    st.session_state.resume_suggestion_id = result["resume_suggestion_id"]
+                    st.success("Resume Optimization Suggestions:")
+                    st.write(result["suggestions"])
+                    st.info(
+                        f"Job Application ID: {result['job_application_id']}, "
+                        f"Resume Suggestion ID: {result['resume_suggestion_id']}"
+                    )
                 else:
-                    st.success("Generated Cover Letter:")
-                    st.write(result["cover_letter"])
-                    st.info(f"Cover Letter Length: {result['length']} characters")
-                # Note: If follow-up is needed, we'll display a follow-up form below.
-            else:
-                st.error("Error generating cover letter. Please try again.")
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
+                    st.error("Error optimizing resume. Please try again.")
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
 
-    # Follow-up form for Cover Letter Generation (if required)
+    # ----- Task 4: Cover Letter Generation -----
+    if col2.button("Cover Letter Generation"):
+        # Check if cached cover letter exists
+        if st.session_state.get("cover_letter_result"):
+            st.success("Cached Generated Cover Letter:")
+            st.write(st.session_state.cover_letter_result)
+            st.info(f"Cover Letter Length: {len(st.session_state.cover_letter_result)} characters")
+        else:
+            files = {
+                "resume_file": (
+                    "resume.pdf",
+                    st.session_state.resume_file,
+                    "application/pdf"
+                )
+            }
+            data = {
+                "job_application_id": st.session_state.job_application_id,
+                "job_description": st.session_state.job_description,
+                "company": st.session_state.company,
+                "job_title": st.session_state.job_title,
+                "follow_up_answers": ""  # initially empty
+            }
+            try:
+                response = requests.post(f"{BASE_URL}/task4/cover-letter", files=files, data=data)
+                if response.status_code == 200:
+                    result = response.json()
+                    if result.get("follow_up_needed"):
+                        st.session_state.cover_letter_data = data
+                        st.session_state.cover_letter_files = files
+                        st.session_state.cover_letter_questions = result.get("questions", [])
+                        st.session_state.cover_letter_initial = True
+                    else:
+                        st.session_state.cover_letter_result = result["cover_letter"]
+                        st.success("Generated Cover Letter:")
+                        st.write(result["cover_letter"])
+                        st.info(f"Cover Letter Length: {result['length']} characters")
+                    # If follow-up is required, follow-up form will be displayed below.
+                else:
+                    st.error("Error generating cover letter. Please try again.")
+            except Exception as e:
+                st.error(f"An error occurred: {e}")
+
+    # Follow-Up Form for Cover Letter Generation (if needed)
     if st.session_state.get("cover_letter_initial") and st.session_state.get("cover_letter_questions"):
         st.warning("Additional context is required for your cover letter:")
         st.write("Follow-Up Questions:")
@@ -176,6 +197,7 @@ if (
                 response2 = requests.post(f"{BASE_URL}/task4/cover-letter", files=st.session_state.cover_letter_files, data=st.session_state.cover_letter_data)
                 if response2.status_code == 200:
                     result2 = response2.json()
+                    st.session_state.cover_letter_result = result2["cover_letter"]
                     st.success("Generated Cover Letter:")
                     st.write(result2["cover_letter"])
                     st.info(f"Cover Letter Length: {result2['length']} characters")
@@ -188,8 +210,8 @@ if (
             except Exception as e:
                 st.error(f"An error occurred: {e}")
 
-    # --- Task 2: Insider Connection Request ---
-    # Use a session flag so the form persists similar to Task 1
+    # ----- Task 2: Insider Connection Request -----
+    # Use a session flag to persist the form.
     if "show_task2_form" not in st.session_state:
         st.session_state.show_task2_form = False
 
