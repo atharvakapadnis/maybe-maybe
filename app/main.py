@@ -12,12 +12,10 @@ import openai
 
 from app.database import SessionLocal, init_db
 from mcp.client import mcp_instance as mcp
-
 from tools.task1_connection import generate_linkedin_connection_request
 from tools.task2_inquiry import linkedin_job_inquiry_request
 from tools.task3_resume_optimization import resume_optimization
 from tools.task4_cover_letter import generate_cover_letter_initial, generate_cover_letter_final
-
 from models.models import Person, JobApplication, ResumeSuggestion, CoverLetter, JobInquiry
 
 load_dotenv()
@@ -33,14 +31,37 @@ def get_db():
     finally:
         db.close()
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to Agentic Tasks API"}
+# ---------------------------
+# New Endpoint: Save Job Application
+# ---------------------------
+class JobApplicationRequest(BaseModel):
+    job_description: str
+    company: str
+    job_title: str
+    date_applied: str | None = None  
 
-@app.get("/test-db")
-def test_db(db: Session = Depends(get_db)):
-    result = db.execute(text("SELECT 1")).scalar()
-    return {"db_connection": result}
+@app.post("/job-application")
+def save_job_application(request: JobApplicationRequest, db: Session = Depends(get_db)):
+    if request.date_applied:
+        date_obj = datetime.datetime.strptime(request.date_applied, "%Y-%m-%d")
+    else:
+        date_obj = datetime.datetime.utcnow()
+    job_app = JobApplication(
+        company=request.company,
+        job_title=request.job_title,
+        job_description=request.job_description,
+        date_applied=date_obj
+    )
+    db.add(job_app)
+    db.commit()
+    db.refresh(job_app)
+    return {
+        "job_application_id": job_app.id,
+        "company": job_app.company,
+        "job_title": job_app.job_title,
+        "job_description": job_app.job_description,
+        "date_applied": str(job_app.date_applied)
+    }
 
 # ---------------------------
 # Task 1: LinkedIn Connection Request (Person Table)
@@ -76,35 +97,23 @@ def create_linkedin_request_endpoint(request: LinkedInRequest, db: Session = Dep
 # Task 2: LinkedIn Job Inquiry Request (JobInquiry Table)
 # ---------------------------
 class LinkedInJobInquiryRequest(BaseModel):
-    name: str
-    role: str
-    company: str
+    job_application_id: int
+    contact_name: str
+    contact_role: str
     about_section: str | None = None
     job_posting: str
 
 @app.post("/task2/job-inquiry")
 def create_job_inquiry(request: LinkedInJobInquiryRequest, db: Session = Depends(get_db)):
     generated_message = linkedin_job_inquiry_request(
-        name=request.name,
+        name=request.contact_name,
         about_section=request.about_section or "",
         job_posting=request.job_posting
     )
-    # Create a new JobApplication record
-    job_app = JobApplication(
-        company=request.company,
-        job_title="Job Inquiry",  # Default title for inquiry applications
-        job_description=request.job_posting,
-        date_applied=datetime.datetime.utcnow()
-    )
-    db.add(job_app)
-    db.commit()
-    db.refresh(job_app)
-    
-    # Create a new JobInquiry record referencing the JobApplication
     job_inquiry = JobInquiry(
-        job_application_id=job_app.id,
-        contact_name=request.name,
-        contact_role=request.role,
+        job_application_id=request.job_application_id,
+        contact_name=request.contact_name,
+        contact_role=request.contact_role,
         date_reached_out=datetime.datetime.utcnow(),
         message_sent=generated_message
     )
@@ -120,14 +129,11 @@ def create_job_inquiry(request: LinkedInJobInquiryRequest, db: Session = Depends
 # ---------------------------
 # Task 3: Resume Optimization Suggestions (ResumeSuggestion Table)
 # ---------------------------
-# This endpoint accepts a PDF file for the resume.
 @app.post("/task3/resume-optimization")
 async def resume_optimization_pdf(
     resume_file: UploadFile = File(...),
+    job_application_id: int = Form(...),
     job_description: str = Form(...),
-    company: str = Form(...),
-    job_title: str = Form(...),
-    date_applied: str = Form(None),  # Format: YYYY-MM-DD, optional
     db: Session = Depends(get_db)
 ):
     try:
@@ -143,21 +149,8 @@ async def resume_optimization_pdf(
             resume_text=extracted_text,
             job_description=job_description
         )
-        if date_applied:
-            date_obj = datetime.datetime.strptime(date_applied, "%Y-%m-%d")
-        else:
-            date_obj = datetime.datetime.utcnow()
-        job_app = JobApplication(
-            company=company,
-            job_title=job_title,
-            job_description=job_description,
-            date_applied=date_obj
-        )
-        db.add(job_app)
-        db.commit()
-        db.refresh(job_app)
         resume_sugg = ResumeSuggestion(
-            job_application_id=job_app.id,
+            job_application_id=job_application_id,
             suggestions=suggestions
         )
         db.add(resume_sugg)
@@ -165,7 +158,7 @@ async def resume_optimization_pdf(
         db.refresh(resume_sugg)
         return {
             "suggestions": suggestions,
-            "job_application_id": job_app.id,
+            "job_application_id": job_application_id,
             "resume_suggestion_id": resume_sugg.id
         }
     except Exception as e:
@@ -174,10 +167,10 @@ async def resume_optimization_pdf(
 # ---------------------------
 # Task 4: Cover Letter Generation (CoverLetter Table)
 # ---------------------------
-# For this endpoint, we accept a PDF resume and additional context if needed.
 @app.post("/task4/cover-letter")
 async def cover_letter_endpoint(
     resume_file: UploadFile = File(...),
+    job_application_id: int = Form(...),
     job_description: str = Form(...),
     company: str = Form(...),
     job_title: str = Form(...),
@@ -208,18 +201,8 @@ async def cover_letter_endpoint(
                 job_description=job_description,
                 follow_up_answers=follow_up_answers
             )
-        # Save cover letter and associated job application in the database.
-        job_app = JobApplication(
-            company=company,
-            job_title=job_title,
-            job_description=job_description,
-            date_applied=datetime.datetime.utcnow()
-        )
-        db.add(job_app)
-        db.commit()
-        db.refresh(job_app)
         cover_letter_record = CoverLetter(
-            job_application_id=job_app.id,
+            job_application_id=job_application_id,
             cover_letter=cover_letter_text
         )
         db.add(cover_letter_record)
@@ -227,7 +210,7 @@ async def cover_letter_endpoint(
         db.refresh(cover_letter_record)
         return {
             "cover_letter": cover_letter_text,
-            "job_application_id": job_app.id,
+            "job_application_id": job_application_id,
             "cover_letter_id": cover_letter_record.id,
             "length": len(cover_letter_text)
         }
